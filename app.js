@@ -2,7 +2,7 @@
 // Tauchlog: Logbuch für Tauchgänge. Alle Daten bleiben im localStorage des Geräts.
 // Bewusst keine Dekompressions- oder Nullzeit-Berechnung: dafür gilt der Tauchcomputer.
 
-const VERSION = '1.8.0';
+const VERSION = '1.8.1';
 const KEY = 'tauchlog-v1';
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -604,7 +604,7 @@ function welcome() {
   <img src="icons/icon-192.png" alt="" width="96" height="96" style="border-radius:22px;box-shadow:0 10px 30px rgba(18,120,196,.45)">
   <h1 style="margin-top:22px">Willkommen bei Tauchlog</h1>
   <div class="sub" style="max-width:320px;margin:0 auto 26px">Dein Logbuch für jeden Tauchgang. Wie heißt du?</div></div>
-  <form id="wf"><label class="f"><span>Dein Name</span><input name="n" autocomplete="given-name" placeholder="z. B. Luka" maxlength="30" required></label>
+  <form id="wf"><label class="f"><span>Dein Name</span><input name="n" autocomplete="given-name" placeholder="Name" maxlength="30" required></label>
   <button class="btn" type="submit">Los geht’s</button></form>
   <p class="small" style="text-align:center;margin-top:16px">Dein Name und alle Daten bleiben nur auf diesem Handy.</p>`);
   $('#wf').addEventListener('submit', e => {
