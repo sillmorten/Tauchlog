@@ -2,7 +2,7 @@
 // Tauchlog: Logbuch für Tauchgänge. Alle Daten bleiben im localStorage des Geräts.
 // Bewusst keine Dekompressions- oder Nullzeit-Berechnung: dafür gilt der Tauchcomputer.
 
-const VERSION = '1.5.0';
+const VERSION = '1.6.0';
 const KEY = 'tauchlog-v1';
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -416,6 +416,7 @@ function closeSheet() { $('#layer').innerHTML = ''; }
 // ---------- Klicks ----------
 let armed = null;
 document.addEventListener('click', e => {
+  const gf = e.target.closest('#gift'); if (gf && !gf.classList.contains('open')) { gf.classList.add('open'); return; }
   const t = e.target.closest('button,[data-dive],[data-site]'); if (!t) return;
   const ds = t.dataset;
   if (ds.tab) { view = ds.tab; closeSheet(); render(); return; }
@@ -466,25 +467,25 @@ document.addEventListener('submit', e => {
 const celQ = [];
 function celebrate(el) { if (document.querySelector('.celebrate')) celQ.push(el); else document.body.appendChild(el); }
 // ---------- Geschenk beim allerersten Start ----------
-const GIFT = { from: 'Morten', title: 'Alles Gute nachträglich zum Geburtstag!', text: 'Diese App habe ich nur für dich gebaut. Für jeden Tauchgang, jeden neuen Platz und jede Beförderung. Viel Spaß damit und immer gut Luft!' };
+// Eine Schleife über den ganzen Bildschirm, danach eine Geburtstagskarte, dann die App.
+const GIFT = { from: 'Morten & Carina', title: 'Alles Gute nachträglich zum Geburtstag!', text: 'Diese App haben wir nur für dich gebaut. Für jeden Tauchgang, jeden neuen Platz und jede Beförderung. Viel Spaß damit und immer gut Luft!' };
 function giftScreen() {
   const el = document.createElement('div'); el.className = 'gift'; el.id = 'gift';
-  el.innerHTML = `<div class="gift-in">
-  <div class="gift-hint">Für dich</div>
-  <button class="gbox" data-act="opengift" aria-label="Geschenk öffnen">
-  <svg viewBox="0 0 200 200" width="230" height="230" aria-hidden="true">
-   <g class="g-body"><rect x="35" y="88" width="130" height="96" rx="8" fill="#1278c4"/><rect x="35" y="88" width="130" height="96" rx="8" fill="url(#gg)"/><rect x="91" y="88" width="18" height="96" fill="#e8b84a"/></g>
-   <g class="g-lid"><rect x="27" y="66" width="146" height="28" rx="7" fill="#1ec8c8"/><rect x="91" y="66" width="18" height="28" fill="#f2c95c"/>
-    <path d="M100 66 C80 30 46 38 58 58 C64 68 86 66 100 66Z" fill="#e8b84a" stroke="#c99a34" stroke-width="2"/>
-    <path d="M100 66 C120 30 154 38 142 58 C136 68 114 66 100 66Z" fill="#e8b84a" stroke="#c99a34" stroke-width="2"/>
-    <circle cx="100" cy="64" r="9" fill="#f2c95c" stroke="#c99a34" stroke-width="2"/></g>
-   <defs><linearGradient id="gg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".12"/><stop offset="1" stop-color="#000" stop-opacity=".25"/></linearGradient></defs>
+  el.innerHTML = `<div class="band bv1"></div><div class="band bv2"></div><div class="band bh1"></div><div class="band bh2"></div>
+  <button class="bow" data-act="opengift" aria-label="Schleife öffnen"><svg viewBox="0 0 200 140" width="220" height="154" aria-hidden="true">
+   <path d="M100 70 C70 10 10 18 22 58 C30 84 72 78 100 70Z" fill="#e8b84a" stroke="#b8862a" stroke-width="3"/>
+   <path d="M100 70 C130 10 190 18 178 58 C170 84 128 78 100 70Z" fill="#e8b84a" stroke="#b8862a" stroke-width="3"/>
+   <path d="M38 50 C52 40 74 50 92 66 M162 50 C148 40 126 50 108 66" fill="none" stroke="#f6d77e" stroke-width="3" stroke-linecap="round" opacity=".8"/>
+   <path d="M92 76 L70 132 L84 126 L92 138 L98 80Z M108 76 L130 132 L116 126 L108 138 L102 80Z" fill="#d9a63c" stroke="#b8862a" stroke-width="2.5" stroke-linejoin="round"/>
+   <rect x="86" y="56" width="28" height="28" rx="9" fill="#f2c95c" stroke="#b8862a" stroke-width="3"/>
   </svg></button>
   <div class="gift-tap">Tippe auf die Schleife</div>
-  <div class="gcard"><div class="small" style="text-transform:uppercase;letter-spacing:1.5px;font-weight:700;color:#e8b84a">Von ${esc(GIFT.from)}</div>
-  <h1 style="font-size:28px;margin:10px 0 12px">${esc(GIFT.title)}</h1>
-  <p class="note" style="color:var(--mut);margin-bottom:22px">${esc(GIFT.text)}</p>
-  <button class="btn" data-act="giftdone">Zur App</button></div></div>`;
+  <div class="bcard"><div class="bcard-in">
+   <div class="bc-top">🎂</div>
+   <h1>${esc(GIFT.title)}</h1>
+   <p>${esc(GIFT.text)}</p>
+   <div class="bc-sign">Von ${esc(GIFT.from)}</div>
+  </div><button class="btn" data-act="giftdone" style="margin-top:18px">Zur App</button></div>`;
   document.body.appendChild(el);
 }
 // ---------- Dienstgrade (Schulterklappen) ----------
