@@ -2,7 +2,7 @@
 // Tauchlog: Logbuch für Tauchgänge. Alle Daten bleiben im localStorage des Geräts.
 // Bewusst keine Dekompressions- oder Nullzeit-Berechnung: dafür gilt der Tauchcomputer.
 
-const VERSION = '1.0.0';
+const VERSION = '1.1.0';
 const KEY = 'tauchlog-v1';
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));

@@ -1,7 +1,8 @@
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{--bg:#04121f;--fg:#e8f4fa;--mut:#8fb8cf;--mut2:#6f9bb5;--acc:#3fe0e0;--acc2:#1278c4;--card:rgba(255,255,255,.06);--line:rgba(255,255,255,.08);--warn:#ffd08a}
-html,body{background:var(--bg);color:var(--fg);font-family:-apple-system,"SF Pro Text","Inter","Helvetica Neue",Arial,sans-serif;font-size:16px}
-body{min-height:100vh;background:linear-gradient(180deg,#0a3350 0%,#06223a 280px,#04121f 600px) fixed}
+html,body{color:var(--fg);font-family:-apple-system,"SF Pro Text","Inter","Helvetica Neue",Arial,sans-serif;font-size:16px}
+html{background:linear-gradient(180deg,#0a3350 0%,#06223a 280px,#04121f 600px) fixed #04121f}
+body{min-height:100vh;background:transparent}
 button,input,select,textarea{font:inherit;color:inherit}
 button{background:none;border:none;cursor:pointer}
 main{padding:calc(env(safe-area-inset-top) + 16px) 18px calc(env(safe-area-inset-bottom) + 110px);max-width:560px;margin:0 auto}
@@ -92,3 +93,19 @@ label.f>span{display:block;font-size:13px;color:var(--mut);margin:0 0 5px 2px}
 .pop-btn{margin-top:8px;padding:6px 12px;border-radius:10px;background:#1278c4;color:#fff;font-weight:600;font-size:13px}
 .leaflet-control-zoom a{background:#06223a!important;color:#e8f4fa!important;border-color:rgba(255,255,255,.1)!important}
 .map{isolation:isolate;position:relative;z-index:0}
+
+/* Bewegter Wasser-Hintergrund: nur transform/opacity, damit es flüssig läuft und den Akku schont */
+.ocean{position:fixed;inset:0;z-index:-1;overflow:hidden;pointer-events:none}
+.ray{position:absolute;top:-20%;width:38%;height:120%;background:linear-gradient(180deg,rgba(120,230,255,.16),rgba(120,230,255,0) 70%);filter:blur(18px);transform-origin:top center;will-change:transform,opacity}
+.r1{left:5%;animation:sway 11s ease-in-out infinite alternate}
+.r2{left:38%;width:26%;animation:sway 14s ease-in-out -4s infinite alternate-reverse}
+.r3{left:68%;width:30%;animation:sway 17s ease-in-out -8s infinite alternate}
+@keyframes sway{0%{transform:rotate(-9deg);opacity:.55}50%{opacity:1}100%{transform:rotate(9deg);opacity:.6}}
+.caus{position:absolute;width:140vmax;height:140vmax;left:-20vmax;top:-60vmax;border-radius:50%;background:radial-gradient(circle at 30% 40%,rgba(63,224,224,.10),transparent 30%),radial-gradient(circle at 70% 60%,rgba(80,170,255,.10),transparent 28%),radial-gradient(circle at 50% 80%,rgba(63,224,224,.07),transparent 25%);will-change:transform}
+.c1{animation:drift 26s ease-in-out infinite alternate}
+.c2{animation:drift 34s ease-in-out -12s infinite alternate-reverse;opacity:.8}
+@keyframes drift{0%{transform:translate(-4%,0) rotate(0) scale(1)}100%{transform:translate(6%,5%) rotate(25deg) scale(1.12)}}
+.bubs i{position:absolute;bottom:-20px;width:var(--s);height:var(--s);border-radius:50%;border:1.5px solid rgba(190,240,255,.45);background:radial-gradient(circle at 30% 30%,rgba(255,255,255,.5),rgba(255,255,255,.04) 60%);animation:rise var(--d) linear var(--w) infinite;will-change:transform,opacity}
+@keyframes rise{0%{transform:translate(0,0);opacity:0}10%{opacity:.8}50%{transform:translate(var(--x),-55vh)}90%{opacity:.6}100%{transform:translate(0,-110vh);opacity:0}}
+.sheet{background:linear-gradient(180deg,rgba(10,51,80,.97) 0%,rgba(4,18,31,.98) 400px)}
+@media (prefers-reduced-motion:reduce){.ray,.caus,.bubs i{animation:none}.bubs{display:none}}
