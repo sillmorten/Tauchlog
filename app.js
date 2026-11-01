@@ -2,7 +2,7 @@
 // Tauchlog: Logbuch für Tauchgänge. Alle Daten bleiben im localStorage des Geräts.
 // Bewusst keine Dekompressions- oder Nullzeit-Berechnung: dafür gilt der Tauchcomputer.
 
-const VERSION = '1.1.0';
+const VERSION = '1.2.0';
 const KEY = 'tauchlog-v1';
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -30,12 +30,16 @@ function fix(s) {
     sites: s.sites && typeof s.sites === 'object' ? s.sites : {},
     brevets: Array.isArray(s.brevets) ? s.brevets : [],
     offset: Number.isInteger(s.offset) ? s.offset : 0,
-    lastBackup: s.lastBackup || null
+    lastBackup: s.lastBackup || null,
+    name: typeof s.name === 'string' ? s.name : '',
+    badges: Array.isArray(s.badges) ? s.badges : [],
+    flags: s.flags && typeof s.flags === 'object' ? s.flags : {}
   };
 }
 let S = load();
 function save() {
   try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { toast('Speichern fehlgeschlagen'); }
+  setTimeout(checkBadges, 350);
 }
 
 let view = 'logbuch';
@@ -80,7 +84,7 @@ function vLog() {
   const list = numbered().reverse();
   const total = list.reduce((s, d) => s + (d.dur || 0), 0);
   const count = list.length + S.offset;
-  let h = `<div class="top"><span></span><button data-act="settings" aria-label="Einstellungen und Backup">Backup</button></div>
+  let h = `<div class="top"><span class="hello">${esc(greeting())} 👋</span><button data-act="settings" aria-label="Einstellungen und Backup">Backup</button></div>
   <h1>Logbuch</h1><div class="sub">${count} Tauchg${count === 1 ? 'ang' : 'änge'}${total ? ' · ' + hm(total) + ' unter Wasser' : ''}</div>`;
   if (!list.length) {
     h += `<div class="empty"><div class="ic">🤿</div><b>Noch keine Tauchgänge</b><br>Tippe auf <b>+</b>, um deinen ersten Tauchgang einzutragen.</div>`;
@@ -188,6 +192,7 @@ function vStats() {
   <div class="bl">${MONTHS.slice(0, upto).map(m => `<span>${m[0]}</span>`).join('')}</div></div>`;
   if (top.length) h += `<div class="sec">Lieblingsplätze</div><div class="card">${top.map(([n, c]) => `<div class="field"><span>${esc(n)}</span><b>${c}×</b></div>`).join('')}</div>`;
   h += `<div class="sec">Brevets</div><div>${S.brevets.map(b => `<button class="chip" data-brevet="${b.id}">${esc(b.name)}</button>`).join('')}<button class="chip add" data-act="addbrevet">+ Brevet</button></div>`;
+  h += vBadges();
   return h;
 }
 function editBrevet(id) {
@@ -370,10 +375,12 @@ function showSettings() {
   <div class="card"><div style="font-weight:700;margin-bottom:4px">Backup</div><div class="small" style="margin-bottom:12px">${S.lastBackup ? 'Letztes Backup: ' + new Date(S.lastBackup).toLocaleDateString('de-DE') : 'Noch kein Backup gemacht.'}</div>
   <button class="btn" data-act="export">Backup speichern</button>
   <label class="btn sec2" style="margin-top:10px">Backup laden<input type="file" id="imp" accept=".json,application/json" hidden></label></div>
+  <div class="card"><div style="font-weight:700;margin-bottom:8px">Dein Name</div><form class="inline" id="nf"><input name="n" maxlength="30" value="${esc(S.name)}"><button class="chip" style="margin:0" type="submit">Sichern</button></form></div>
   <div class="card"><div style="font-weight:700;margin-bottom:4px">Bisherige Tauchgänge</div><div class="small" style="margin-bottom:10px">Wie viele Tauchgänge hattest du schon vor dieser App? Danach richtet sich die Nummerierung.</div>
   <form class="inline" id="of"><input name="o" inputmode="numeric" value="${S.offset}"><button class="chip" style="margin:0" type="submit">Sichern</button></form></div>
   <p class="small" style="text-align:center;margin-top:20px">Tauchlog ${VERSION}<br>Kein Ersatz für Tauchcomputer oder Tauchtabellen.</p>`);
   $('#imp').addEventListener('change', importFile);
+  $('#nf').addEventListener('submit', e => { e.preventDefault(); const v = new FormData(e.target).get('n').trim(); if (v) { S.name = v; save(); toast('Gespeichert'); render(); } });
   $('#of').addEventListener('submit', e => { e.preventDefault(); const v = parseInt(new FormData(e.target).get('o'), 10); S.offset = isFinite(v) && v >= 0 ? v : 0; save(); toast('Gespeichert'); render(); });
 }
 function exportData() {
@@ -415,9 +422,10 @@ document.addEventListener('click', e => {
   if (ds.tab) { view = ds.tab; closeSheet(); render(); return; }
   if (ds.dive) { showDive(ds.dive); return; }
   if (ds.site) { showSite(ds.site); return; }
-  if (ds.gear) { const g = S.gear.find(x => x.id === ds.gear); g.done = !g.done; save(); render(); return; }
+  if (ds.gear) { const g = S.gear.find(x => x.id === ds.gear); g.done = !g.done; if (S.gear.length && S.gear.every(x => x.done)) S.flags.gear = 1; save(); render(); return; }
   if (ds.delgear) { S.gear = S.gear.filter(x => x.id !== ds.delgear); save(); render(); return; }
   if (ds.sf) { siteFilter = ds.sf; render(); return; }
+  if (ds.badge) { const b = badgeList().find(x => x.id === ds.badge); if (b) toast(b.got ? b.txt : b.txt + ' · ' + b.prog); return; }
   if (ds.svc) { editSvc(ds.svc); return; }
   if (ds.brevet) { editBrevet(ds.brevet); return; }
   const a = ds.act; if (!a) return;
@@ -425,6 +433,7 @@ document.addEventListener('click', e => {
   const confirm2 = label => { if (armed === t) { armed = null; return true; } armed = t; t.textContent = label; return false; };
   switch (a) {
     case 'new': editDive(); break;
+    case 'closecel': { const c = t.closest('.celebrate'); if (c) c.remove(); } break;
     case 'edit': editDive(ds.id); break;
     case 'close': closeSheet(); break;
     case 'savedive': saveDive(ds.id); break;
@@ -450,5 +459,79 @@ document.addEventListener('submit', e => {
   if (e.target.id === 'gf') { e.preventDefault(); const v = new FormData(e.target).get('t').trim(); if (v) { S.gear.push({ id: uid(), text: v, done: false }); save(); render(); } }
 });
 
+// ---------- Name & Abzeichen ----------
+function welcome() {
+  sheet(`<div style="text-align:center;padding-top:9vh">
+  <img src="icons/icon-192.png" alt="" width="96" height="96" style="border-radius:22px;box-shadow:0 10px 30px rgba(18,120,196,.45)">
+  <h1 style="margin-top:22px">Willkommen bei Tauchlog</h1>
+  <div class="sub" style="max-width:320px;margin:0 auto 26px">Dein Logbuch für jeden Tauchgang. Wie heißt du?</div></div>
+  <form id="wf"><label class="f"><span>Dein Name</span><input name="n" autocomplete="given-name" placeholder="z. B. Luka" maxlength="30" required></label>
+  <button class="btn" type="submit">Los geht’s 🤿</button></form>
+  <p class="small" style="text-align:center;margin-top:16px">Dein Name und alle Daten bleiben nur auf diesem Handy.</p>`);
+  $('#wf').addEventListener('submit', e => {
+    e.preventDefault(); const n = new FormData(e.target).get('n').trim(); if (!n) return;
+    S.name = n; save(); closeSheet(); render(); toast(`Hallo ${n}!`);
+  });
+}
+function greeting() {
+  const h = new Date().getHours();
+  return (h < 11 ? 'Guten Morgen' : h < 18 ? 'Hallo' : 'Guten Abend') + (S.name ? ', ' + S.name : '');
+}
+
+const country = n => { const b = BUILTIN[n]; const c = (b ? b.c : (S.sites[n] || {}).country) || ''; return c.split(',')[0].trim(); };
+function badgeList() {
+  const ds = S.dives, cnt = ds.length + S.offset;
+  const maxD = Math.max(0, ...ds.map(d => d.depth || 0));
+  const mins = ds.reduce((s, d) => s + (d.dur || 0), 0);
+  const sites = new Set(ds.map(d => d.site).filter(Boolean)).size;
+  const lands = new Set(ds.map(d => d.site && country(d.site)).filter(Boolean)).size;
+  const buds = new Set(ds.map(d => (d.buddy || '').trim().toLowerCase()).filter(Boolean)).size;
+  const perDay = {}; ds.forEach(d => perDay[d.date] = (perDay[d.date] || 0) + 1);
+  const maxDay = Math.max(0, ...Object.values(perDay));
+  const any = f => ds.some(f) ? 1 : 0;
+  const B = (id, e, n, txt, val, goal, unit = '') => ({ id, e, n, txt, got: val >= goal, p: Math.min(1, val / goal), prog: `${unit === 'h' ? Math.floor(val) : val} / ${goal}${unit ? ' ' + unit : ''}` });
+  return [
+    B('first', '🐣', 'Erster Tauchgang', 'Deinen ersten Tauchgang eingetragen', cnt, 1),
+    B('d10', '🐠', '10 Tauchgänge', '10 Tauchgänge im Logbuch', cnt, 10),
+    B('d25', '🐢', '25 Tauchgänge', '25 Tauchgänge im Logbuch', cnt, 25),
+    B('d50', '🐬', '50 Tauchgänge', '50 Tauchgänge im Logbuch', cnt, 50),
+    B('d100', '🦈', '100 Tauchgänge', '100 Tauchgänge, du bist ein alter Hase', cnt, 100),
+    B('d250', '🐋', '250 Tauchgänge', '250 Tauchgänge, Respekt!', cnt, 250),
+    B('h10', '⏱️', '10 Stunden', '10 Stunden unter Wasser', mins / 60, 10, 'h'),
+    B('h50', '⌛', '50 Stunden', '50 Stunden unter Wasser', mins / 60, 50, 'h'),
+    B('m10', '⬇️', '10 Meter', 'Einen Tauchgang auf 10 m eingetragen', maxD, 10, 'm'),
+    B('m18', '🔵', '18 Meter', 'Einen Tauchgang auf 18 m eingetragen. Tiefer nur mit passendem Brevet.', maxD, 18, 'm'),
+    B('long', '🫧', 'Ausdauer', 'Ein Tauchgang mit 60 Minuten oder mehr', Math.max(0, ...ds.map(d => d.dur || 0)), 60, 'min'),
+    B('night', '🌙', 'Nachteule', 'Deinen ersten Nachttauchgang eingetragen', any(d => d.night), 1),
+    B('wreck', '⚓', 'Wrackforscher', 'Einen Wracktauchgang eingetragen', any(d => d.kind === 'Wrack' || (BUILTIN[d.site] && BUILTIN[d.site].t === 'Wrack')), 1),
+    B('cold', '🥶', 'Eisbär', 'Bei 8 °C oder kälter getaucht', any(d => d.temp != null && d.temp <= 8), 1),
+    B('warm', '🌴', 'Tropentaucher', 'Bei 26 °C oder wärmer getaucht', any(d => d.temp != null && d.temp >= 26), 1),
+    B('s5', '📍', 'Entdecker', 'An 5 verschiedenen Plätzen getaucht', sites, 5),
+    B('s15', '🗺️', 'Weltenbummler', 'An 15 verschiedenen Plätzen getaucht', sites, 15),
+    B('l3', '✈️', '3 Länder', 'In 3 Ländern getaucht', lands, 3),
+    B('buddy', '🤝', 'Teamplayer', 'Mit 5 verschiedenen Buddys getaucht', buds, 5),
+    B('day3', '☀️', 'Tauchtag', '3 Tauchgänge an einem Tag', maxDay, 3),
+    B('brevet', '🎓', 'Ausgebildet', 'Dein erstes Brevet eingetragen', S.brevets.length, 1),
+    B('ready', '🎒', 'Gut vorbereitet', 'Die Ausrüstungs-Checkliste komplett abgehakt', S.flags.gear ? 1 : 0, 1),
+    B('backup', '💾', 'Sicher ist sicher', 'Dein erstes Backup gespeichert', S.lastBackup ? 1 : 0, 1)
+  ];
+}
+function vBadges() {
+  const l = badgeList(), got = l.filter(b => b.got).length;
+  return `<div class="sec">Abzeichen · ${got} von ${l.length}</div><div class="badges">${l.map(b => `<button class="badge ${b.got ? 'got' : ''}" data-badge="${b.id}"><span class="be">${b.e}</span><span class="bn">${b.n}</span>${b.got ? '' : `<span class="bp"><i style="width:${Math.round(b.p * 100)}%"></i></span>`}</button>`).join('')}</div>`;
+}
+function checkBadges() {
+  if (!S.name) return;
+  const fresh = badgeList().filter(b => b.got && !S.badges.includes(b.id));
+  if (!fresh.length) return;
+  fresh.forEach(b => S.badges.push(b.id));
+  try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { }
+  const el = document.createElement('div'); el.className = 'celebrate';
+  el.innerHTML = `<div class="cbox"><div class="ce">${fresh.map(b => b.e).join(' ')}</div><div class="small" style="text-transform:uppercase;letter-spacing:1px;font-weight:700;color:var(--acc)">${fresh.length > 1 ? 'Neue Abzeichen' : 'Neues Abzeichen'}!</div>
+  <h2 style="margin:6px 0">${fresh.map(b => b.n).join(', ')}</h2><div class="sub">${fresh.length === 1 ? fresh[0].txt : 'Stark, ' + esc(S.name) + '!'}</div><button class="btn" data-act="closecel">Weiter</button></div>`;
+  document.body.appendChild(el);
+}
+
 render();
+if (!S.name) welcome(); else setTimeout(checkBadges, 600);
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => { });
