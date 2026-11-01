@@ -2,7 +2,7 @@
 // Tauchlog: Logbuch für Tauchgänge. Alle Daten bleiben im localStorage des Geräts.
 // Bewusst keine Dekompressions- oder Nullzeit-Berechnung: dafür gilt der Tauchcomputer.
 
-const VERSION = '1.6.1';
+const VERSION = '1.6.2';
 const KEY = 'tauchlog-v1';
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -471,7 +471,7 @@ const celQ = [];
 function celebrate(el) { if (document.querySelector('.celebrate')) celQ.push(el); else document.body.appendChild(el); }
 // ---------- Geschenk beim allerersten Start ----------
 // Eine Schleife über den ganzen Bildschirm, danach eine Geburtstagskarte, dann die App.
-const GIFT = { from: 'Morten & Carina', title: 'Alles Gute nachträglich zum Geburtstag!', text: 'Diese App haben wir nur für dich gebaut. Für jeden Tauchgang, jeden neuen Platz und jede Beförderung. Viel Spaß damit und immer gut Luft!' };
+const GIFT = { from: 'Morten & Carina', title: 'Alles Gute nachträglich zum Geburtstag!', text: 'Diese App haben wir nur für dich gebaut. Wir wünschen dir ein tolles neues Lebensjahr, viele schöne Tauchgänge und immer gut Luft!' };
 function giftScreen() {
   const el = document.createElement('div'); el.className = 'gift'; el.id = 'gift';
   el.innerHTML = `<div class="band bv1"></div><div class="band bv2"></div><div class="band bh1"></div><div class="band bh2"></div>
