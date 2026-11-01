@@ -2,7 +2,7 @@
 // Tauchlog: Logbuch für Tauchgänge. Alle Daten bleiben im localStorage des Geräts.
 // Bewusst keine Dekompressions- oder Nullzeit-Berechnung: dafür gilt der Tauchcomputer.
 
-const VERSION = '1.6.0';
+const VERSION = '1.6.1';
 const KEY = 'tauchlog-v1';
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -380,6 +380,8 @@ function vSettings() {
   <label class="btn sec2" style="margin-top:10px">Backup laden<input type="file" id="imp" accept=".json,application/json" hidden></label></div>
   <div class="card"><div style="font-weight:700;margin-bottom:4px">Bisherige Tauchgänge</div><div class="small" style="margin-bottom:10px">Wie viele Tauchgänge hattest du schon vor dieser App? Danach richten sich Nummerierung und Dienstgrad.</div>
   <form class="inline" id="of"><input name="o" inputmode="numeric" value="${S.offset}"><button class="chip" style="margin:0" type="submit">Sichern</button></form></div>
+  <div class="card"><div style="font-weight:700;margin-bottom:4px">App zurücksetzen</div><div class="small" style="margin-bottom:12px">Löscht alle Tauchgänge, Plätze, Abzeichen und deinen Namen von diesem Handy. Danach startet die App wie beim ersten Mal. Mach vorher am besten ein Backup.</div>
+  <button class="btn del" data-act="reset">Alles zurücksetzen</button></div>
   <p class="small" style="text-align:center;margin-top:20px">Tauchlog ${VERSION}<br>Kein Ersatz für Tauchcomputer oder Tauchtabellen.</p>`;
 }
 function exportData() {
@@ -448,6 +450,7 @@ document.addEventListener('click', e => {
     case 'delsvc': if (confirm2('Wirklich löschen? Nochmal tippen')) { S.service = S.service.filter(x => x.id !== ds.id); save(); closeSheet(); render(); } break;
     case 'resetgear': S.gear.forEach(g => g.done = false); save(); render(); toast('Checkliste zurückgesetzt'); break;
     case 'addsite': showSite(null); break;
+    case 'reset': if (confirm2('Wirklich alles löschen? Nochmal tippen')) { try { localStorage.removeItem(KEY); } catch (e) { } location.reload(); } break;
     case 'divehere': editDive(null, ds.name); break;
     case 'here': { const el = document.getElementById('smap'); if (el && el._here) el._here(); } break;
     case 'delsite': if (confirm2('Wirklich löschen? Nochmal tippen')) { delete S.sites[ds.name]; save(); closeSheet(); render(); } break;
