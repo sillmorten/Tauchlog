@@ -2,7 +2,7 @@
 // Tauchlog: Logbuch für Tauchgänge. Alle Daten bleiben im localStorage des Geräts.
 // Bewusst keine Dekompressions- oder Nullzeit-Berechnung: dafür gilt der Tauchcomputer.
 
-const VERSION = '1.6.2';
+const VERSION = '1.7.0';
 const KEY = 'tauchlog-v1';
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -419,7 +419,7 @@ function closeSheet() { $('#layer').innerHTML = ''; }
 let armed = null;
 document.addEventListener('click', e => {
   const gf = e.target.closest('#gift'); if (gf && !gf.classList.contains('open')) { gf.classList.add('open'); return; }
-  const t = e.target.closest('button,[data-dive],[data-site]'); if (!t) return;
+  const t = e.target.closest('button,[data-dive],[data-site],[data-act=unfold]'); if (!t) return;
   const ds = t.dataset;
   if (ds.tab) { view = ds.tab; closeSheet(); render(); return; }
   if (ds.dive) { showDive(ds.dive); return; }
@@ -435,6 +435,7 @@ document.addEventListener('click', e => {
   const confirm2 = label => { if (armed === t) { armed = null; return true; } armed = t; t.textContent = label; return false; };
   switch (a) {
     case 'new': editDive(); break;
+    case 'unfold': { const bk = t.closest('.bc-book'); if (bk) { bk.classList.add('open'); bk.closest('.bcard').classList.add('unfolded'); } } break;
     case 'opengift': { const g = $('#gift'); if (g && !g.classList.contains('open')) g.classList.add('open'); } break;
     case 'giftdone': { S.gifted = true; save(); const g = $('#gift'); if (g) { g.classList.add('bye'); setTimeout(() => g.remove(), 400); } if (!S.name) welcome(); } break;
     case 'ranks': showRanks(); break;
@@ -471,7 +472,7 @@ const celQ = [];
 function celebrate(el) { if (document.querySelector('.celebrate')) celQ.push(el); else document.body.appendChild(el); }
 // ---------- Geschenk beim allerersten Start ----------
 // Eine Schleife über den ganzen Bildschirm, danach eine Geburtstagskarte, dann die App.
-const GIFT = { from: 'Morten & Carina', title: 'Alles Gute nachträglich zum Geburtstag!', text: 'Diese App haben wir nur für dich gebaut. Wir wünschen dir ein tolles neues Lebensjahr, viele schöne Tauchgänge und immer gut Luft!' };
+const GIFT = { to: 'Hey Geburtstagskind,', from: 'Morten & Carina', title: 'Alles Gute nachträglich zum Geburtstag!', text: 'alles Gute nachträglich zu deinem Geburtstag! Wir wünschen dir ein tolles neues Lebensjahr, viele schöne Tauchgänge und immer gut Luft. Diese App haben wir nur für dich gebaut.' };
 function giftScreen() {
   const el = document.createElement('div'); el.className = 'gift'; el.id = 'gift';
   el.innerHTML = `<div class="band bv1"></div><div class="band bv2"></div><div class="band bh1"></div><div class="band bh2"></div>
@@ -483,12 +484,34 @@ function giftScreen() {
    <rect x="86" y="56" width="28" height="28" rx="9" fill="#f2c95c" stroke="#b8862a" stroke-width="3"/>
   </svg></button>
   <div class="gift-tap">Tippe auf die Schleife</div>
-  <div class="bcard"><div class="bcard-in">
-   <div class="bc-top">🎂</div>
-   <h1>${esc(GIFT.title)}</h1>
-   <p>${esc(GIFT.text)}</p>
-   <div class="bc-sign">Von ${esc(GIFT.from)}</div>
-  </div><button class="btn" data-act="giftdone" style="margin-top:18px">Zur App</button></div>`;
+  <div class="bcard"><div class="bc-book" data-act="unfold">
+   <div class="bc-inside"><div class="bc-hand">
+    <div class="bc-hi">${esc(GIFT.to)}</div>
+    <p>${esc(GIFT.text)}</p>
+    <div class="bc-sign">Alles Liebe,<br>${esc(GIFT.from)}</div></div></div>
+   <div class="bc-front">
+    <div class="bc-face"><svg viewBox="0 0 240 230" width="100%" aria-hidden="true">
+     <g opacity=".9"><circle cx="30" cy="40" r="5" fill="#ff8a8a"/><circle cx="210" cy="30" r="4" fill="#3fbfd0"/><circle cx="196" cy="88" r="3" fill="#e8b84a"/><circle cx="44" cy="100" r="3" fill="#1278c4"/><rect x="60" y="20" width="8" height="4" rx="2" fill="#e8b84a" transform="rotate(30 64 22)"/><rect x="170" y="56" width="8" height="4" rx="2" fill="#ff8a8a" transform="rotate(-25 174 58)"/><rect x="22" y="150" width="8" height="4" rx="2" fill="#3fbfd0" transform="rotate(40 26 152)"/><rect x="214" y="140" width="8" height="4" rx="2" fill="#1278c4" transform="rotate(-40 218 142)"/></g>
+     <g fill="none" stroke="#3fbfd0" stroke-width="1.6" opacity=".7"><circle cx="190" cy="120" r="5"/><circle cx="200" cy="104" r="3.5"/><circle cx="194" cy="92" r="2.5"/></g>
+     <g transform="translate(36 150) scale(.9)"><path d="M0 10 Q12 0 24 10 Q12 20 0 10Z" fill="#ff9f43"/><path d="M24 10 L34 2 L34 18Z" fill="#ff9f43"/><circle cx="7" cy="8" r="1.6" fill="#14304a"/></g>
+     <path d="M120 38 v-12" stroke="#c99a34" stroke-width="2"/><path d="M95 44 v-12 M145 44 v-12" stroke="#c99a34" stroke-width="2"/>
+     <g fill="#ffb347"><path d="M120 22 q-6 -8 0 -16 q6 8 0 16Z"/><path d="M95 30 q-5 -7 0 -14 q5 7 0 14Z"/><path d="M145 30 q-5 -7 0 -14 q5 7 0 14Z"/></g>
+     <rect x="88" y="38" width="14" height="30" rx="3" fill="#7fd6e0"/><rect x="113" y="32" width="14" height="36" rx="3" fill="#ff8a8a"/><rect x="138" y="38" width="14" height="30" rx="3" fill="#e8b84a"/>
+     <rect x="62" y="66" width="116" height="46" rx="10" fill="#fff" stroke="#e9d5b0" stroke-width="2"/>
+     <path d="M62 82 q10 12 19 0 q10 12 19 0 q10 12 19 0 q10 12 19 0 q10 12 19 0 q10 12 20 0" fill="#ff8a8a"/>
+     <rect x="44" y="110" width="152" height="62" rx="12" fill="#1278c4"/><rect x="44" y="110" width="152" height="62" rx="12" fill="url(#ck)"/>
+     <path d="M44 126 q12 14 25 0 q13 14 25 0 q13 14 25 0 q13 14 26 0 q13 14 26 0 q13 14 25 0" fill="#fff" opacity=".95"/>
+     <g fill="#e8b84a"><circle cx="76" cy="150" r="4"/><circle cx="120" cy="154" r="4"/><circle cx="164" cy="150" r="4"/></g>
+     <ellipse cx="120" cy="178" rx="96" ry="9" fill="#e9d5b0"/>
+     <path d="M0 214 q20 -10 40 0 t40 0 t40 0 t40 0 t40 0 t40 0 V230 H0Z" fill="#3fbfd0" opacity=".35"/>
+     <defs><linearGradient id="ck" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".15"/><stop offset="1" stop-color="#000" stop-opacity=".2"/></linearGradient></defs>
+    </svg>
+     <div class="bc-title">Alles Gute<br>zum Geburtstag!</div><div class="bc-sub">nachträglich</div></div>
+    <div class="bc-back"></div>
+   </div>
+  </div>
+  <div class="bc-tap">Tippe auf die Karte, um sie aufzuklappen</div>
+  <button class="btn bc-go" data-act="giftdone">Zur App</button></div>`;
   document.body.appendChild(el);
 }
 // ---------- Dienstgrade (Schulterklappen) ----------
