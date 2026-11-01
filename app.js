@@ -2,7 +2,7 @@
 // Tauchlog: Logbuch für Tauchgänge. Alle Daten bleiben im localStorage des Geräts.
 // Bewusst keine Dekompressions- oder Nullzeit-Berechnung: dafür gilt der Tauchcomputer.
 
-const VERSION = '1.7.0';
+const VERSION = '1.8.0';
 const KEY = 'tauchlog-v1';
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -418,7 +418,7 @@ function closeSheet() { $('#layer').innerHTML = ''; }
 // ---------- Klicks ----------
 let armed = null;
 document.addEventListener('click', e => {
-  const gf = e.target.closest('#gift'); if (gf && !gf.classList.contains('open')) { gf.classList.add('open'); return; }
+  const gf = e.target.closest('#gift'); if (gf && !gf.classList.contains('open')) { gf.classList.add('open'); playBirthday(); return; }
   const t = e.target.closest('button,[data-dive],[data-site],[data-act=unfold]'); if (!t) return;
   const ds = t.dataset;
   if (ds.tab) { view = ds.tab; closeSheet(); render(); return; }
@@ -472,7 +472,7 @@ const celQ = [];
 function celebrate(el) { if (document.querySelector('.celebrate')) celQ.push(el); else document.body.appendChild(el); }
 // ---------- Geschenk beim allerersten Start ----------
 // Eine Schleife über den ganzen Bildschirm, danach eine Geburtstagskarte, dann die App.
-const GIFT = { to: 'Hey Geburtstagskind,', from: 'Morten & Carina', title: 'Alles Gute nachträglich zum Geburtstag!', text: 'alles Gute nachträglich zu deinem Geburtstag! Wir wünschen dir ein tolles neues Lebensjahr, viele schöne Tauchgänge und immer gut Luft. Diese App haben wir nur für dich gebaut.' };
+const GIFT = { to: 'Lieber Lars,', from: 'Morten & Carina', title: 'Alles Gute nachträglich zum Geburtstag!', text: 'alles Gute nachträglich zu deinem Geburtstag! Wir wünschen dir ein tolles neues Lebensjahr, viele schöne Tauchgänge und immer gut Luft. Diese App haben wir nur für dich gebaut.' };
 function giftScreen() {
   const el = document.createElement('div'); el.className = 'gift'; el.id = 'gift';
   el.innerHTML = `<div class="band bv1"></div><div class="band bv2"></div><div class="band bh1"></div><div class="band bh2"></div>
@@ -513,6 +513,29 @@ function giftScreen() {
   <div class="bc-tap">Tippe auf die Karte, um sie aufzuklappen</div>
   <button class="btn bc-go" data-act="giftdone">Zur App</button></div>`;
   document.body.appendChild(el);
+}
+// Happy Birthday als Spieluhr-Melodie, direkt im Browser erzeugt (Web Audio). Startet erst durch den Tipp.
+function playBirthday() {
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+    const ac = new AC(); if (ac.state === 'suspended') ac.resume();
+    const F = { G4: 392, A4: 440, B4: 493.88, C5: 523.25, D5: 587.33, E5: 659.25, F5: 698.46, G5: 783.99 };
+    const M = [['G4', .75], ['G4', .25], ['A4', 1], ['G4', 1], ['C5', 1], ['B4', 2],
+      ['G4', .75], ['G4', .25], ['A4', 1], ['G4', 1], ['D5', 1], ['C5', 2],
+      ['G4', .75], ['G4', .25], ['G5', 1], ['E5', 1], ['C5', 1], ['B4', 1], ['A4', 2],
+      ['F5', .75], ['F5', .25], ['E5', 1], ['C5', 1], ['D5', 1], ['C5', 3]];
+    const beat = .45, master = ac.createGain(); master.gain.value = .5; master.connect(ac.destination);
+    let t = ac.currentTime + .15;
+    const note = (f, at, len, vol) => {
+      [[1, 'sine', vol], [2, 'sine', vol * .25], [3, 'triangle', vol * .08]].forEach(([m, type, v]) => {
+        const o = ac.createOscillator(), g = ac.createGain(); o.type = type; o.frequency.value = f * m;
+        g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(v, at + .012); g.gain.exponentialRampToValueAtTime(.0008, at + Math.max(.6, len * 1.4));
+        o.connect(g); g.connect(master); o.start(at); o.stop(at + Math.max(.7, len * 1.5));
+      });
+    };
+    M.forEach(([n, b]) => { note(F[n], t, b * beat, .32); if (b >= 1) note(F[n] / 2, t, b * beat, .1); t += b * beat; });
+    setTimeout(() => ac.close().catch(() => { }), (t - ac.currentTime + 2) * 1000);
+  } catch (e) { }
 }
 // ---------- Dienstgrade (Schulterklappen) ----------
 const RANKS = [
