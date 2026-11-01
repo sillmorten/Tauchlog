@@ -2,7 +2,7 @@
 // Tauchlog: Logbuch für Tauchgänge. Alle Daten bleiben im localStorage des Geräts.
 // Bewusst keine Dekompressions- oder Nullzeit-Berechnung: dafür gilt der Tauchcomputer.
 
-const VERSION = '1.2.0';
+const VERSION = '1.3.0';
 const KEY = 'tauchlog-v1';
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -33,7 +33,8 @@ function fix(s) {
     lastBackup: s.lastBackup || null,
     name: typeof s.name === 'string' ? s.name : '',
     badges: Array.isArray(s.badges) ? s.badges : [],
-    flags: s.flags && typeof s.flags === 'object' ? s.flags : {}
+    flags: s.flags && typeof s.flags === 'object' ? s.flags : {},
+    rank: Number.isInteger(s.rank) ? s.rank : null
   };
 }
 let S = load();
@@ -84,7 +85,7 @@ function vLog() {
   const list = numbered().reverse();
   const total = list.reduce((s, d) => s + (d.dur || 0), 0);
   const count = list.length + S.offset;
-  let h = `<div class="top"><span class="hello">${esc(greeting())} 👋</span><button data-act="settings" aria-label="Einstellungen und Backup">Backup</button></div>
+  let h = `<div class="top"><span class="hello">${esc(greeting())}</span><span class="topr"><button data-act="settings" aria-label="Einstellungen und Backup">Backup</button><button class="rank" data-act="ranks" aria-label="Dienstgrad">${rankSvg(RANKS[rankIdx(count)], 42)}</button></span></div>
   <h1>Logbuch</h1><div class="sub">${count} Tauchg${count === 1 ? 'ang' : 'änge'}${total ? ' · ' + hm(total) + ' unter Wasser' : ''}</div>`;
   if (!list.length) {
     h += `<div class="empty"><div class="ic">🤿</div><b>Noch keine Tauchgänge</b><br>Tippe auf <b>+</b>, um deinen ersten Tauchgang einzutragen.</div>`;
@@ -219,7 +220,7 @@ function vGear() {
   const now = pd(today());
   const sv = [...S.service].sort((a, b) => (a.due || '9').localeCompare(b.due || '9'));
   return `<h1>Ausrüstung</h1><div class="sub">Checkliste vor dem Tauchgang</div>
-  <div class="card"><div style="display:flex;justify-content:space-between;font-weight:700"><span>${done === S.gear.length && done ? 'Alles gepackt 🎉' : 'Gepackt'}</span><span style="color:var(--acc)">${done} von ${S.gear.length}</span></div><div class="prog"><i style="width:${pct}%"></i></div></div>
+  <div class="card"><div style="display:flex;justify-content:space-between;font-weight:700"><span>${done === S.gear.length && done ? 'Alles gepackt' : 'Gepackt'}</span><span style="color:var(--acc)">${done} von ${S.gear.length}</span></div><div class="prog"><i style="width:${pct}%"></i></div></div>
   <div class="card" style="padding:4px 16px">${S.gear.map(g => `<div class="check ${g.done ? 'dn' : ''}"><button class="box" data-gear="${g.id}" aria-label="abhaken">${g.done ? '✓' : ''}</button><button class="tx" data-gear="${g.id}" style="text-align:left">${esc(g.text)}</button><button class="x" data-delgear="${g.id}" aria-label="entfernen">×</button></div>`).join('')}
   <form class="inline" id="gf" style="padding:8px 0 10px"><input name="t" placeholder="Eigenen Punkt hinzufügen"><button class="chip" style="margin:0" type="submit">+</button></form></div>
   ${done ? `<button class="btn sec2" data-act="resetgear">Checkliste zurücksetzen</button>` : ''}
@@ -433,7 +434,8 @@ document.addEventListener('click', e => {
   const confirm2 = label => { if (armed === t) { armed = null; return true; } armed = t; t.textContent = label; return false; };
   switch (a) {
     case 'new': editDive(); break;
-    case 'closecel': { const c = t.closest('.celebrate'); if (c) c.remove(); } break;
+    case 'ranks': showRanks(); break;
+    case 'closecel': { const c = t.closest('.celebrate'); if (c) c.remove(); const nx = celQ.shift(); if (nx) document.body.appendChild(nx); } break;
     case 'edit': editDive(ds.id); break;
     case 'close': closeSheet(); break;
     case 'savedive': saveDive(ds.id); break;
@@ -459,6 +461,56 @@ document.addEventListener('submit', e => {
   if (e.target.id === 'gf') { e.preventDefault(); const v = new FormData(e.target).get('t').trim(); if (v) { S.gear.push({ id: uid(), text: v, done: false }); save(); render(); } }
 });
 
+const celQ = [];
+function celebrate(el) { if (document.querySelector('.celebrate')) celQ.push(el); else document.body.appendChild(el); }
+// ---------- Dienstgrade (Schulterklappen) ----------
+const RANKS = [
+  { min: 0, n: 'Anwärter', ins: [] },
+  { min: 1, n: 'Taucher', ins: ['v1'] },
+  { min: 10, n: 'Obertaucher', ins: ['v2'] },
+  { min: 25, n: 'Haupttaucher', ins: ['v3'] },
+  { min: 50, n: 'Tauchmeister', ins: ['s1'] },
+  { min: 100, n: 'Obertauchmeister', ins: ['s2'] },
+  { min: 200, n: 'Tauchkapitän', ins: ['s3'] },
+  { min: 350, n: 'Kommandant der Tiefe', ins: ['a'], gold: 1 },
+  { min: 500, n: 'Admiral der Tiefe', ins: ['a', 's2'], gold: 1 }
+];
+function rankIdx(c) { let i = 0; RANKS.forEach((r, k) => { if (c >= r.min) i = k; }); return i; }
+function rankSvg(r, h = 40) {
+  const G = '#e8b84a', bg = r.gold ? '#1a3550' : '#0d2a44';
+  const star = (x, y, s) => { let p = ''; for (let k = 0; k < 10; k++) { const a = Math.PI / 5 * k - Math.PI / 2, rr = k % 2 ? s * .45 : s; p += (k ? 'L' : 'M') + (x + rr * Math.cos(a)).toFixed(1) + ' ' + (y + rr * Math.sin(a)).toFixed(1); } return `<path d="${p}Z" fill="${G}"/>`; };
+  const chev = (y) => `<path d="M9 ${y} L20 ${y + 7} L31 ${y}" fill="none" stroke="${G}" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>`;
+  let g = '';
+  r.ins.forEach(t => {
+    if (t[0] === 'v') { const n = +t[1]; for (let i = 0; i < n; i++) g += chev(44 - i * 8); }
+    if (t[0] === 's') { const n = +t[1], ys = r.ins[0] === 'a' ? [44, 51.5] : n === 1 ? [40] : n === 2 ? [34, 48] : [28, 40, 52]; ys.forEach(y => g += star(20, y, r.ins[0] === 'a' ? 3.8 : n === 1 ? 7 : 5.6)); }
+    if (t === 'a') g += `<g fill="none" stroke="${G}" stroke-width="2.6" stroke-linecap="round"><circle cx="20" cy="${r.ins.length > 1 ? 21 : 28}" r="3"/><path d="M20 ${r.ins.length > 1 ? 24 : 31}v${r.ins.length > 1 ? 14 : 20} M13 ${r.ins.length > 1 ? 28 : 35}h14 M11 ${r.ins.length > 1 ? 33 : 43}q9 ${r.ins.length > 1 ? 9 : 10} 18 0"/></g>`;
+  });
+  return `<svg viewBox="0 0 40 64" height="${h}" width="${h * 40 / 64}" aria-hidden="true"><rect x="2" y="2" width="36" height="60" rx="9" fill="${bg}" stroke="${G}" stroke-width="${r.gold ? 3 : 2}"/><circle cx="20" cy="11" r="3.2" fill="${G}"/>${r.gold ? `<path d="M6 57h28" stroke="${G}" stroke-width="2"/>` : ''}${g}</svg>`;
+}
+function showRanks() {
+  const c = S.dives.length + S.offset, i = rankIdx(c), r = RANKS[i], nx = RANKS[i + 1];
+  sheet(`<div class="top"><button data-act="close">‹ Zurück</button><span></span></div>
+  <div style="text-align:center;margin:6px 0 18px"><div class="rank-big">${rankSvg(r, 120)}</div><h2 style="margin-top:12px">${r.n}</h2>
+  <div class="sub">${c} Tauchg${c === 1 ? 'ang' : 'änge'}${nx ? ` · noch ${nx.min - c} bis ${nx.n}` : ' · höchster Dienstgrad erreicht'}</div>
+  ${nx ? `<div class="prog" style="max-width:260px;margin:0 auto"><i style="width:${Math.round((c - r.min) / (nx.min - r.min) * 100)}%"></i></div>` : ''}</div>
+  <div class="sec">Alle Dienstgrade</div>
+  <div class="card" style="padding:4px 16px">${RANKS.map((x, k) => `<div class="field" style="align-items:center;${k > i ? 'opacity:.45' : ''}"><span style="display:flex;align-items:center;gap:12px;color:var(--fg)">${rankSvg(x, 38)}<span><b>${x.n}</b>${k === i ? ' <span class="pill ok">aktuell</span>' : ''}</span></span><b>${x.min ? 'ab ' + x.min : 'Start'}</b></div>`).join('')}</div>
+  <p class="small" style="text-align:center;margin-top:12px">Jeder eingetragene Tauchgang zählt. Bisherige Tauchgänge vor der App stellst du unter Backup ein.</p>`);
+}
+function checkRank() {
+  if (!S.name) return;
+  const i = rankIdx(S.dives.length + S.offset);
+  if (S.rank == null) { S.rank = i; return; }
+  if (i <= S.rank) { S.rank = Math.min(S.rank, i); return; }
+  S.rank = i;
+  const r = RANKS[i];
+  const el = document.createElement('div'); el.className = 'celebrate';
+  el.innerHTML = `<div class="cbox"><div class="ce">${rankSvg(r, 110)}</div><div class="small" style="text-transform:uppercase;letter-spacing:1px;font-weight:700;color:var(--acc)">Beförderung!</div>
+  <h2 style="margin:6px 0">${r.n}</h2><div class="sub">Glückwunsch, ${esc(S.name)}! Du hast ${r.min} Tauchg${r.min === 1 ? 'ang' : 'änge'} erreicht.</div><button class="btn" data-act="closecel">Weiter</button></div>`;
+  celebrate(el);
+}
+
 // ---------- Name & Abzeichen ----------
 function welcome() {
   sheet(`<div style="text-align:center;padding-top:9vh">
@@ -466,7 +518,7 @@ function welcome() {
   <h1 style="margin-top:22px">Willkommen bei Tauchlog</h1>
   <div class="sub" style="max-width:320px;margin:0 auto 26px">Dein Logbuch für jeden Tauchgang. Wie heißt du?</div></div>
   <form id="wf"><label class="f"><span>Dein Name</span><input name="n" autocomplete="given-name" placeholder="z. B. Luka" maxlength="30" required></label>
-  <button class="btn" type="submit">Los geht’s 🤿</button></form>
+  <button class="btn" type="submit">Los geht’s</button></form>
   <p class="small" style="text-align:center;margin-top:16px">Dein Name und alle Daten bleiben nur auf diesem Handy.</p>`);
   $('#wf').addEventListener('submit', e => {
     e.preventDefault(); const n = new FormData(e.target).get('n').trim(); if (!n) return;
@@ -489,47 +541,52 @@ function badgeList() {
   const perDay = {}; ds.forEach(d => perDay[d.date] = (perDay[d.date] || 0) + 1);
   const maxDay = Math.max(0, ...Object.values(perDay));
   const any = f => ds.some(f) ? 1 : 0;
-  const B = (id, e, n, txt, val, goal, unit = '') => ({ id, e, n, txt, got: val >= goal, p: Math.min(1, val / goal), prog: `${unit === 'h' ? Math.floor(val) : val} / ${goal}${unit ? ' ' + unit : ''}` });
+  const B = (id, k, n, txt, val, goal, unit = '') => ({ id, k, n, txt, got: val >= goal, p: Math.min(1, val / goal), prog: `${unit === 'h' ? Math.floor(val) : val} / ${goal}${unit ? ' ' + unit : ''}` });
   return [
-    B('first', '🐣', 'Erster Tauchgang', 'Deinen ersten Tauchgang eingetragen', cnt, 1),
-    B('d10', '🐠', '10 Tauchgänge', '10 Tauchgänge im Logbuch', cnt, 10),
-    B('d25', '🐢', '25 Tauchgänge', '25 Tauchgänge im Logbuch', cnt, 25),
-    B('d50', '🐬', '50 Tauchgänge', '50 Tauchgänge im Logbuch', cnt, 50),
-    B('d100', '🦈', '100 Tauchgänge', '100 Tauchgänge, du bist ein alter Hase', cnt, 100),
-    B('d250', '🐋', '250 Tauchgänge', '250 Tauchgänge, Respekt!', cnt, 250),
-    B('h10', '⏱️', '10 Stunden', '10 Stunden unter Wasser', mins / 60, 10, 'h'),
-    B('h50', '⌛', '50 Stunden', '50 Stunden unter Wasser', mins / 60, 50, 'h'),
-    B('m10', '⬇️', '10 Meter', 'Einen Tauchgang auf 10 m eingetragen', maxD, 10, 'm'),
-    B('m18', '🔵', '18 Meter', 'Einen Tauchgang auf 18 m eingetragen. Tiefer nur mit passendem Brevet.', maxD, 18, 'm'),
-    B('long', '🫧', 'Ausdauer', 'Ein Tauchgang mit 60 Minuten oder mehr', Math.max(0, ...ds.map(d => d.dur || 0)), 60, 'min'),
-    B('night', '🌙', 'Nachteule', 'Deinen ersten Nachttauchgang eingetragen', any(d => d.night), 1),
-    B('wreck', '⚓', 'Wrackforscher', 'Einen Wracktauchgang eingetragen', any(d => d.kind === 'Wrack' || (BUILTIN[d.site] && BUILTIN[d.site].t === 'Wrack')), 1),
-    B('cold', '🥶', 'Eisbär', 'Bei 8 °C oder kälter getaucht', any(d => d.temp != null && d.temp <= 8), 1),
-    B('warm', '🌴', 'Tropentaucher', 'Bei 26 °C oder wärmer getaucht', any(d => d.temp != null && d.temp >= 26), 1),
-    B('s5', '📍', 'Entdecker', 'An 5 verschiedenen Plätzen getaucht', sites, 5),
-    B('s15', '🗺️', 'Weltenbummler', 'An 15 verschiedenen Plätzen getaucht', sites, 15),
-    B('l3', '✈️', '3 Länder', 'In 3 Ländern getaucht', lands, 3),
-    B('buddy', '🤝', 'Teamplayer', 'Mit 5 verschiedenen Buddys getaucht', buds, 5),
-    B('day3', '☀️', 'Tauchtag', '3 Tauchgänge an einem Tag', maxDay, 3),
-    B('brevet', '🎓', 'Ausgebildet', 'Dein erstes Brevet eingetragen', S.brevets.length, 1),
-    B('ready', '🎒', 'Gut vorbereitet', 'Die Ausrüstungs-Checkliste komplett abgehakt', S.flags.gear ? 1 : 0, 1),
-    B('backup', '💾', 'Sicher ist sicher', 'Dein erstes Backup gespeichert', S.lastBackup ? 1 : 0, 1)
+    B('first', '1', 'Erster Tauchgang', 'Deinen ersten Tauchgang eingetragen', cnt, 1),
+    B('d10', '10', '10 Tauchgänge', '10 Tauchgänge im Logbuch', cnt, 10),
+    B('d25', '25', '25 Tauchgänge', '25 Tauchgänge im Logbuch', cnt, 25),
+    B('d50', '50', '50 Tauchgänge', '50 Tauchgänge im Logbuch', cnt, 50),
+    B('d100', '100', '100 Tauchgänge', '100 Tauchgänge, du bist ein alter Hase', cnt, 100),
+    B('d250', '250', '250 Tauchgänge', '250 Tauchgänge, Respekt!', cnt, 250),
+    B('h10', '10h', '10 Stunden', '10 Stunden unter Wasser', mins / 60, 10, 'h'),
+    B('h50', '50h', '50 Stunden', '50 Stunden unter Wasser', mins / 60, 50, 'h'),
+    B('m10', '10m', '10 Meter', 'Einen Tauchgang auf 10 m eingetragen', maxD, 10, 'm'),
+    B('m18', '18m', '18 Meter', 'Einen Tauchgang auf 18 m eingetragen. Tiefer nur mit passendem Brevet.', maxD, 18, 'm'),
+    B('long', '60′', 'Ausdauer', 'Ein Tauchgang mit 60 Minuten oder mehr', Math.max(0, ...ds.map(d => d.dur || 0)), 60, 'min'),
+    B('night', 'N', 'Nachteule', 'Deinen ersten Nachttauchgang eingetragen', any(d => d.night), 1),
+    B('wreck', 'W', 'Wrackforscher', 'Einen Wracktauchgang eingetragen', any(d => d.kind === 'Wrack' || (BUILTIN[d.site] && BUILTIN[d.site].t === 'Wrack')), 1),
+    B('cold', '8°', 'Eisbär', 'Bei 8 °C oder kälter getaucht', any(d => d.temp != null && d.temp <= 8), 1),
+    B('warm', '26°', 'Tropentaucher', 'Bei 26 °C oder wärmer getaucht', any(d => d.temp != null && d.temp >= 26), 1),
+    B('s5', '5P', 'Entdecker', 'An 5 verschiedenen Plätzen getaucht', sites, 5),
+    B('s15', '15P', 'Weltenbummler', 'An 15 verschiedenen Plätzen getaucht', sites, 15),
+    B('l3', '3L', '3 Länder', 'In 3 Ländern getaucht', lands, 3),
+    B('buddy', '5B', 'Teamplayer', 'Mit 5 verschiedenen Buddys getaucht', buds, 5),
+    B('day3', '3×', 'Tauchtag', '3 Tauchgänge an einem Tag', maxDay, 3),
+    B('brevet', 'BR', 'Ausgebildet', 'Dein erstes Brevet eingetragen', S.brevets.length, 1),
+    B('ready', '✓', 'Gut vorbereitet', 'Die Ausrüstungs-Checkliste komplett abgehakt', S.flags.gear ? 1 : 0, 1),
+    B('backup', 'BK', 'Sicher ist sicher', 'Dein erstes Backup gespeichert', S.lastBackup ? 1 : 0, 1)
   ];
+}
+function medalSvg(k, got, h = 46) {
+  const G = got ? '#e8b84a' : '#3a5368', bg = got ? '#0d2a44' : 'rgba(255,255,255,.04)', fs = k.length > 2 ? 13 : 16;
+  return `<svg viewBox="0 0 48 48" width="${h}" height="${h}" aria-hidden="true"><circle cx="24" cy="24" r="21" fill="${bg}" stroke="${G}" stroke-width="2.5"/><circle cx="24" cy="24" r="16.5" fill="none" stroke="${G}" stroke-width="1" stroke-dasharray="2 2.2" opacity=".8"/><text x="24" y="24" dy=".36em" text-anchor="middle" font-family="-apple-system,Inter,Arial,sans-serif" font-weight="800" font-size="${fs}" fill="${G}">${k}</text></svg>`;
 }
 function vBadges() {
   const l = badgeList(), got = l.filter(b => b.got).length;
-  return `<div class="sec">Abzeichen · ${got} von ${l.length}</div><div class="badges">${l.map(b => `<button class="badge ${b.got ? 'got' : ''}" data-badge="${b.id}"><span class="be">${b.e}</span><span class="bn">${b.n}</span>${b.got ? '' : `<span class="bp"><i style="width:${Math.round(b.p * 100)}%"></i></span>`}</button>`).join('')}</div>`;
+  return `<div class="sec">Abzeichen · ${got} von ${l.length}</div><div class="badges">${l.map(b => `<button class="badge ${b.got ? 'got' : ''}" data-badge="${b.id}">${medalSvg(b.k, b.got)}<span class="bn">${b.n}</span>${b.got ? '' : `<span class="bp"><i style="width:${Math.round(b.p * 100)}%"></i></span>`}</button>`).join('')}</div>`;
 }
 function checkBadges() {
   if (!S.name) return;
+  checkRank();
   const fresh = badgeList().filter(b => b.got && !S.badges.includes(b.id));
   if (!fresh.length) return;
   fresh.forEach(b => S.badges.push(b.id));
   try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { }
   const el = document.createElement('div'); el.className = 'celebrate';
-  el.innerHTML = `<div class="cbox"><div class="ce">${fresh.map(b => b.e).join(' ')}</div><div class="small" style="text-transform:uppercase;letter-spacing:1px;font-weight:700;color:var(--acc)">${fresh.length > 1 ? 'Neue Abzeichen' : 'Neues Abzeichen'}!</div>
-  <h2 style="margin:6px 0">${fresh.map(b => b.n).join(', ')}</h2><div class="sub">${fresh.length === 1 ? fresh[0].txt : 'Stark, ' + esc(S.name) + '!'}</div><button class="btn" data-act="closecel">Weiter</button></div>`;
-  document.body.appendChild(el);
+  el.innerHTML = `<div class="cbox"><div class="ce">${fresh.slice(0, 4).map(b => medalSvg(b.k, true, 64)).join(' ')}</div><div class="small" style="text-transform:uppercase;letter-spacing:1px;font-weight:700;color:var(--acc)">${fresh.length > 1 ? 'Neue Abzeichen' : 'Neues Abzeichen'}!</div>
+  <h2 style="margin:6px 0">${fresh.map(b => b.n).join(', ')}</h2><div class="sub">${fresh.length === 1 ? fresh[0].txt : 'Gut gemacht, ' + esc(S.name) + '.'}</div><button class="btn" data-act="closecel">Weiter</button></div>`;
+  celebrate(el);
 }
 
 render();
