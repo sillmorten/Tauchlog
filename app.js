@@ -2,7 +2,7 @@
 // Tauchlog: Logbuch für Tauchgänge. Alle Daten bleiben im localStorage des Geräts.
 // Bewusst keine Dekompressions- oder Nullzeit-Berechnung: dafür gilt der Tauchcomputer.
 
-const VERSION = '1.4.0';
+const VERSION = '1.5.0';
 const KEY = 'tauchlog-v1';
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -34,7 +34,8 @@ function fix(s) {
     name: typeof s.name === 'string' ? s.name : '',
     badges: Array.isArray(s.badges) ? s.badges : [],
     flags: s.flags && typeof s.flags === 'object' ? s.flags : {},
-    rank: Number.isInteger(s.rank) ? s.rank : null
+    rank: Number.isInteger(s.rank) ? s.rank : null,
+    gifted: !!s.gifted
   };
 }
 let S = load();
@@ -431,6 +432,8 @@ document.addEventListener('click', e => {
   const confirm2 = label => { if (armed === t) { armed = null; return true; } armed = t; t.textContent = label; return false; };
   switch (a) {
     case 'new': editDive(); break;
+    case 'opengift': { const g = $('#gift'); if (g && !g.classList.contains('open')) g.classList.add('open'); } break;
+    case 'giftdone': { S.gifted = true; save(); const g = $('#gift'); if (g) { g.classList.add('bye'); setTimeout(() => g.remove(), 400); } if (!S.name) welcome(); } break;
     case 'ranks': showRanks(); break;
     case 'closecel': { const c = t.closest('.celebrate'); if (c) c.remove(); const nx = celQ.shift(); if (nx) document.body.appendChild(nx); } break;
     case 'edit': editDive(ds.id); break;
@@ -462,6 +465,28 @@ document.addEventListener('submit', e => {
 
 const celQ = [];
 function celebrate(el) { if (document.querySelector('.celebrate')) celQ.push(el); else document.body.appendChild(el); }
+// ---------- Geschenk beim allerersten Start ----------
+const GIFT = { from: 'Morten', title: 'Alles Gute nachträglich zum Geburtstag!', text: 'Diese App habe ich nur für dich gebaut. Für jeden Tauchgang, jeden neuen Platz und jede Beförderung. Viel Spaß damit und immer gut Luft!' };
+function giftScreen() {
+  const el = document.createElement('div'); el.className = 'gift'; el.id = 'gift';
+  el.innerHTML = `<div class="gift-in">
+  <div class="gift-hint">Für dich</div>
+  <button class="gbox" data-act="opengift" aria-label="Geschenk öffnen">
+  <svg viewBox="0 0 200 200" width="230" height="230" aria-hidden="true">
+   <g class="g-body"><rect x="35" y="88" width="130" height="96" rx="8" fill="#1278c4"/><rect x="35" y="88" width="130" height="96" rx="8" fill="url(#gg)"/><rect x="91" y="88" width="18" height="96" fill="#e8b84a"/></g>
+   <g class="g-lid"><rect x="27" y="66" width="146" height="28" rx="7" fill="#1ec8c8"/><rect x="91" y="66" width="18" height="28" fill="#f2c95c"/>
+    <path d="M100 66 C80 30 46 38 58 58 C64 68 86 66 100 66Z" fill="#e8b84a" stroke="#c99a34" stroke-width="2"/>
+    <path d="M100 66 C120 30 154 38 142 58 C136 68 114 66 100 66Z" fill="#e8b84a" stroke="#c99a34" stroke-width="2"/>
+    <circle cx="100" cy="64" r="9" fill="#f2c95c" stroke="#c99a34" stroke-width="2"/></g>
+   <defs><linearGradient id="gg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".12"/><stop offset="1" stop-color="#000" stop-opacity=".25"/></linearGradient></defs>
+  </svg></button>
+  <div class="gift-tap">Tippe auf die Schleife</div>
+  <div class="gcard"><div class="small" style="text-transform:uppercase;letter-spacing:1.5px;font-weight:700;color:#e8b84a">Von ${esc(GIFT.from)}</div>
+  <h1 style="font-size:28px;margin:10px 0 12px">${esc(GIFT.title)}</h1>
+  <p class="note" style="color:var(--mut);margin-bottom:22px">${esc(GIFT.text)}</p>
+  <button class="btn" data-act="giftdone">Zur App</button></div></div>`;
+  document.body.appendChild(el);
+}
 // ---------- Dienstgrade (Schulterklappen) ----------
 const RANKS = [
   { min: 0, n: 'Anwärter', ins: [] },
@@ -602,5 +627,6 @@ function checkBadges() {
 }
 
 render();
+if (!S.gifted && !S.name && !S.dives.length) giftScreen();
 if (!S.name) welcome(); else setTimeout(checkBadges, 600);
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => { });
