@@ -2,7 +2,7 @@
 // Tauchlog: Logbuch für Tauchgänge. Alle Daten bleiben im localStorage des Geräts.
 // Bewusst keine Dekompressions- oder Nullzeit-Berechnung: dafür gilt der Tauchcomputer.
 
-const VERSION = '1.3.0';
+const VERSION = '1.4.0';
 const KEY = 'tauchlog-v1';
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -62,12 +62,13 @@ const IC = {
   logbuch: 'M4 5h16v14H4z M8 9h8 M8 13h8',
   statistik: 'M5 19V11 M12 19V5 M19 19v-6',
   ausruestung: 'M5 12l4 4 10-10',
-  plaetze: 'M12 21s-7-6.5-7-12a7 7 0 0114 0c0 5.5-7 12-7 12z M12 9.5a.5.5 0 100 .01'
+  plaetze: 'M12 21s-7-6.5-7-12a7 7 0 0114 0c0 5.5-7 12-7 12z M12 9.5a.5.5 0 100 .01',
+  einstellungen: 'M12 15a3 3 0 100-6 3 3 0 000 6z M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09a1.65 1.65 0 001.51-1 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33h0a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51h0a1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82v0a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z'
 };
 const svg = p => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${p}"/></svg>`;
 
 function renderTabs() {
-  const t = [['logbuch', 'Logbuch'], ['statistik', 'Statistik'], ['ausruestung', 'Ausrüstung'], ['plaetze', 'Plätze']];
+  const t = [['logbuch', 'Logbuch'], ['statistik', 'Statistik'], ['ausruestung', 'Ausrüstung'], ['plaetze', 'Plätze'], ['einstellungen', 'Einstellungen']];
   $('#tabbar').innerHTML = t.map(([k, l]) => `<button data-tab="${k}" class="${k === view ? 'a' : ''}">${svg(IC[k])}${l}</button>`).join('');
 }
 
@@ -75,7 +76,7 @@ function render() {
   renderTabs();
   if (mainMap) { mainMap.remove(); mainMap = null; }
   const m = $('#app');
-  m.innerHTML = ({ logbuch: vLog, statistik: vStats, ausruestung: vGear, plaetze: vSites })[view]();
+  m.innerHTML = ({ logbuch: vLog, statistik: vStats, ausruestung: vGear, plaetze: vSites, einstellungen: vSettings })[view]();
   window.scrollTo(0, 0);
   if (view === 'plaetze') initMainMap();
 }
@@ -85,11 +86,11 @@ function vLog() {
   const list = numbered().reverse();
   const total = list.reduce((s, d) => s + (d.dur || 0), 0);
   const count = list.length + S.offset;
-  let h = `<div class="top"><span class="hello">${esc(greeting())}</span><span class="topr"><button data-act="settings" aria-label="Einstellungen und Backup">Backup</button><button class="rank" data-act="ranks" aria-label="Dienstgrad">${rankSvg(RANKS[rankIdx(count)], 42)}</button></span></div>
+  let h = `<div class="top"><span class="hello">${esc(greeting())}</span><button class="rank" data-act="ranks" aria-label="Dienstgrad: ${RANKS[rankIdx(count)].n}">${rankSvgH(RANKS[rankIdx(count)], 30)}</button></div>
   <h1>Logbuch</h1><div class="sub">${count} Tauchg${count === 1 ? 'ang' : 'änge'}${total ? ' · ' + hm(total) + ' unter Wasser' : ''}</div>`;
   if (!list.length) {
     h += `<div class="empty"><div class="ic">🤿</div><b>Noch keine Tauchgänge</b><br>Tippe auf <b>+</b>, um deinen ersten Tauchgang einzutragen.</div>`;
-    if (!S.offset) h += `<p class="small" style="text-align:center">Du tauchst schon länger? Unter <b>Backup</b> kannst du einstellen, mit welcher Nummer dein Logbuch weiterzählt.</p>`;
+    if (!S.offset) h += `<p class="small" style="text-align:center">Du tauchst schon länger? Unter <b>Einstellungen</b> kannst du einstellen, mit welcher Nummer dein Logbuch weiterzählt.</p>`;
   } else {
     const l = list[0];
     const ago = Math.round((pd(today()) - pd(l.date)) / 864e5);
@@ -370,26 +371,22 @@ function showSite(name) {
   });
 }
 // ---------- Einstellungen / Backup ----------
-function showSettings() {
-  sheet(`<div class="top"><button data-act="close">Fertig</button><span></span></div>
-  <h2>Backup & Einstellungen</h2><div class="sub">Deine Daten liegen nur auf diesem Handy. Sichere sie ab und zu als Datei.</div>
-  <div class="card"><div style="font-weight:700;margin-bottom:4px">Backup</div><div class="small" style="margin-bottom:12px">${S.lastBackup ? 'Letztes Backup: ' + new Date(S.lastBackup).toLocaleDateString('de-DE') : 'Noch kein Backup gemacht.'}</div>
+function vSettings() {
+  return `<h1>Einstellungen</h1><div class="sub">Deine Daten liegen nur auf diesem Handy.</div>
+  <div class="card"><div style="font-weight:700;margin-bottom:8px">Dein Name</div><form class="inline" id="nf"><input name="n" maxlength="30" value="${esc(S.name)}"><button class="chip" style="margin:0" type="submit">Sichern</button></form></div>
+  <div class="card"><div style="font-weight:700;margin-bottom:4px">Backup</div><div class="small" style="margin-bottom:12px">${S.lastBackup ? 'Letztes Backup: ' + new Date(S.lastBackup).toLocaleDateString('de-DE') : 'Noch kein Backup gemacht. Sichere deine Daten ab und zu als Datei.'}</div>
   <button class="btn" data-act="export">Backup speichern</button>
   <label class="btn sec2" style="margin-top:10px">Backup laden<input type="file" id="imp" accept=".json,application/json" hidden></label></div>
-  <div class="card"><div style="font-weight:700;margin-bottom:8px">Dein Name</div><form class="inline" id="nf"><input name="n" maxlength="30" value="${esc(S.name)}"><button class="chip" style="margin:0" type="submit">Sichern</button></form></div>
-  <div class="card"><div style="font-weight:700;margin-bottom:4px">Bisherige Tauchgänge</div><div class="small" style="margin-bottom:10px">Wie viele Tauchgänge hattest du schon vor dieser App? Danach richtet sich die Nummerierung.</div>
+  <div class="card"><div style="font-weight:700;margin-bottom:4px">Bisherige Tauchgänge</div><div class="small" style="margin-bottom:10px">Wie viele Tauchgänge hattest du schon vor dieser App? Danach richten sich Nummerierung und Dienstgrad.</div>
   <form class="inline" id="of"><input name="o" inputmode="numeric" value="${S.offset}"><button class="chip" style="margin:0" type="submit">Sichern</button></form></div>
-  <p class="small" style="text-align:center;margin-top:20px">Tauchlog ${VERSION}<br>Kein Ersatz für Tauchcomputer oder Tauchtabellen.</p>`);
-  $('#imp').addEventListener('change', importFile);
-  $('#nf').addEventListener('submit', e => { e.preventDefault(); const v = new FormData(e.target).get('n').trim(); if (v) { S.name = v; save(); toast('Gespeichert'); render(); } });
-  $('#of').addEventListener('submit', e => { e.preventDefault(); const v = parseInt(new FormData(e.target).get('o'), 10); S.offset = isFinite(v) && v >= 0 ? v : 0; save(); toast('Gespeichert'); render(); });
+  <p class="small" style="text-align:center;margin-top:20px">Tauchlog ${VERSION}<br>Kein Ersatz für Tauchcomputer oder Tauchtabellen.</p>`;
 }
 function exportData() {
   S.lastBackup = Date.now(); save();
   const blob = new Blob([JSON.stringify({ app: 'tauchlog', version: VERSION, exported: new Date().toISOString(), data: S }, null, 1)], { type: 'application/json' });
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `tauchlog-backup-${today()}.json`;
   document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
-  toast('Backup gespeichert'); showSettings();
+  toast('Backup gespeichert'); render();
 }
 function importFile(e) {
   const file = e.target.files[0]; if (!file) return;
@@ -440,7 +437,6 @@ document.addEventListener('click', e => {
     case 'close': closeSheet(); break;
     case 'savedive': saveDive(ds.id); break;
     case 'del': if (confirm2('Wirklich löschen? Nochmal tippen')) { S.dives = S.dives.filter(x => x.id !== ds.id); save(); closeSheet(); render(); toast('Gelöscht'); } break;
-    case 'settings': showSettings(); break;
     case 'export': exportData(); break;
     case 'addbrevet': editBrevet(); break;
     case 'delbrevet': if (confirm2('Wirklich löschen? Nochmal tippen')) { S.brevets = S.brevets.filter(x => x.id !== ds.id); save(); closeSheet(); render(); } break;
@@ -457,7 +453,10 @@ let sqT;
 document.addEventListener('input', e => {
   if (e.target.id === 'sq') { siteQuery = e.target.value; clearTimeout(sqT); sqT = setTimeout(refreshSites, 200); }
 });
+document.addEventListener('change', e => { if (e.target.id === 'imp') importFile(e); });
 document.addEventListener('submit', e => {
+  if (e.target.id === 'nf') { e.preventDefault(); const v = new FormData(e.target).get('n').trim(); if (v) { S.name = v; save(); toast('Gespeichert'); render(); } return; }
+  if (e.target.id === 'of') { e.preventDefault(); const v = parseInt(new FormData(e.target).get('o'), 10); S.offset = isFinite(v) && v >= 0 ? v : 0; save(); toast('Gespeichert'); render(); return; }
   if (e.target.id === 'gf') { e.preventDefault(); const v = new FormData(e.target).get('t').trim(); if (v) { S.gear.push({ id: uid(), text: v, done: false }); save(); render(); } }
 });
 
@@ -488,15 +487,28 @@ function rankSvg(r, h = 40) {
   });
   return `<svg viewBox="0 0 40 64" height="${h}" width="${h * 40 / 64}" aria-hidden="true"><rect x="2" y="2" width="36" height="60" rx="9" fill="${bg}" stroke="${G}" stroke-width="${r.gold ? 3 : 2}"/><circle cx="20" cy="11" r="3.2" fill="${G}"/>${r.gold ? `<path d="M6 57h28" stroke="${G}" stroke-width="2"/>` : ''}${g}</svg>`;
 }
+// Liegende Schulterklappe für oben rechts: Abzeichen bleiben aufrecht
+function rankSvgH(r, h = 30) {
+  const G = '#e8b84a', bg = r.gold ? '#1a3550' : '#0d2a44';
+  const star = (x, y, s) => { let p = ''; for (let k = 0; k < 10; k++) { const a = Math.PI / 5 * k - Math.PI / 2, rr = k % 2 ? s * .45 : s; p += (k ? 'L' : 'M') + (x + rr * Math.cos(a)).toFixed(1) + ' ' + (y + rr * Math.sin(a)).toFixed(1); } return `<path d="${p}Z" fill="${G}"/>`; };
+  let g = '';
+  const anchor = (x) => `<g fill="none" stroke="${G}" stroke-width="2.2" stroke-linecap="round"><circle cx="${x}" cy="9.5" r="2.4"/><path d="M${x} 12v15 M${x - 5} 15h10 M${x - 7} 22q7 8 14 0"/></g>`;
+  r.ins.forEach(t => {
+    if (t[0] === 'v') { const n = +t[1], y0 = 20 - (n - 1) * 3.5 - 3; for (let i = 0; i < n; i++) g += `<path d="M30 ${y0 + i * 7} L39 ${y0 + i * 7 + 6} L48 ${y0 + i * 7}" fill="none" stroke="${G}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`; }
+    if (t[0] === 's') { const n = +t[1]; const xs = r.ins[0] === 'a' ? [46, 53] : n === 1 ? [39] : n === 2 ? [33, 45] : [28, 39, 50]; xs.forEach(x => g += star(x, 20, r.ins[0] === 'a' ? 3.6 : n === 1 ? 6.5 : 5.2)); }
+    if (t === 'a') g += anchor(r.ins.length > 1 ? 33 : 39);
+  });
+  return `<svg viewBox="0 0 64 40" height="${h}" width="${h * 64 / 40}" aria-hidden="true"><rect x="2" y="2" width="60" height="36" rx="9" fill="${bg}" stroke="${G}" stroke-width="${r.gold ? 3 : 2}"/><circle cx="11" cy="20" r="3" fill="${G}"/>${r.gold ? `<path d="M58 7v26" stroke="${G}" stroke-width="2"/>` : ''}${g}</svg>`;
+}
 function showRanks() {
   const c = S.dives.length + S.offset, i = rankIdx(c), r = RANKS[i], nx = RANKS[i + 1];
   sheet(`<div class="top"><button data-act="close">‹ Zurück</button><span></span></div>
-  <div style="text-align:center;margin:6px 0 18px"><div class="rank-big">${rankSvg(r, 120)}</div><h2 style="margin-top:12px">${r.n}</h2>
+  <div style="text-align:center;margin:6px 0 18px"><div class="rank-big">${rankSvgH(r, 90)}</div><h2 style="margin-top:12px">${r.n}</h2>
   <div class="sub">${c} Tauchg${c === 1 ? 'ang' : 'änge'}${nx ? ` · noch ${nx.min - c} bis ${nx.n}` : ' · höchster Dienstgrad erreicht'}</div>
   ${nx ? `<div class="prog" style="max-width:260px;margin:0 auto"><i style="width:${Math.round((c - r.min) / (nx.min - r.min) * 100)}%"></i></div>` : ''}</div>
   <div class="sec">Alle Dienstgrade</div>
-  <div class="card" style="padding:4px 16px">${RANKS.map((x, k) => `<div class="field" style="align-items:center;${k > i ? 'opacity:.45' : ''}"><span style="display:flex;align-items:center;gap:12px;color:var(--fg)">${rankSvg(x, 38)}<span><b>${x.n}</b>${k === i ? ' <span class="pill ok">aktuell</span>' : ''}</span></span><b>${x.min ? 'ab ' + x.min : 'Start'}</b></div>`).join('')}</div>
-  <p class="small" style="text-align:center;margin-top:12px">Jeder eingetragene Tauchgang zählt. Bisherige Tauchgänge vor der App stellst du unter Backup ein.</p>`);
+  <div class="card" style="padding:4px 16px">${RANKS.map((x, k) => `<div class="field" style="align-items:center;${k > i ? 'opacity:.45' : ''}"><span style="display:flex;align-items:center;gap:12px;color:var(--fg)">${rankSvgH(x, 26)}<span><b>${x.n}</b>${k === i ? ' <span class="pill ok">aktuell</span>' : ''}</span></span><b>${x.min ? 'ab ' + x.min : 'Start'}</b></div>`).join('')}</div>
+  <p class="small" style="text-align:center;margin-top:12px">Jeder eingetragene Tauchgang zählt. Bisherige Tauchgänge vor der App stellst du unter Einstellungen ein.</p>`);
 }
 function checkRank() {
   if (!S.name) return;
@@ -506,7 +518,7 @@ function checkRank() {
   S.rank = i;
   const r = RANKS[i];
   const el = document.createElement('div'); el.className = 'celebrate';
-  el.innerHTML = `<div class="cbox"><div class="ce">${rankSvg(r, 110)}</div><div class="small" style="text-transform:uppercase;letter-spacing:1px;font-weight:700;color:var(--acc)">Beförderung!</div>
+  el.innerHTML = `<div class="cbox"><div class="ce">${rankSvgH(r, 80)}</div><div class="small" style="text-transform:uppercase;letter-spacing:1px;font-weight:700;color:var(--acc)">Beförderung!</div>
   <h2 style="margin:6px 0">${r.n}</h2><div class="sub">Glückwunsch, ${esc(S.name)}! Du hast ${r.min} Tauchg${r.min === 1 ? 'ang' : 'änge'} erreicht.</div><button class="btn" data-act="closecel">Weiter</button></div>`;
   celebrate(el);
 }

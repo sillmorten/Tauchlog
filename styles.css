@@ -25,9 +25,9 @@ h2{font-size:26px;font-weight:800;letter-spacing:-.3px;margin:4px 0 4px}
 .dive .r span{display:block;color:var(--mut);font-size:12px}
 .sec{font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--mut2);margin:18px 4px 8px;font-weight:700}
 .tabbar{position:fixed;bottom:0;left:0;right:0;padding:10px 0 calc(env(safe-area-inset-bottom) + 8px);background:rgba(4,18,31,.94);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-top:1px solid var(--line);display:flex;justify-content:space-around;z-index:5}
-.tabbar button{font-size:11px;color:var(--mut2);width:76px;text-align:center}
+.tabbar button{font-size:10.5px;color:var(--mut2);flex:1;min-width:0;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 2px}
 .tabbar button.a{color:var(--acc)}
-.tabbar svg{width:26px;height:26px;display:block;margin:0 auto 3px}
+.tabbar svg{width:24px;height:24px;display:block;margin:0 auto 3px}
 .fab{position:fixed;right:20px;bottom:calc(env(safe-area-inset-bottom) + 92px);width:60px;height:60px;border-radius:30px;background:linear-gradient(135deg,#1ec8c8,#1278c4);display:flex;align-items:center;justify-content:center;font-size:34px;color:#fff;box-shadow:0 8px 24px rgba(18,120,196,.5);z-index:4}
 .field{display:flex;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid var(--line);font-size:15px}
 .field:last-child{border:none}
